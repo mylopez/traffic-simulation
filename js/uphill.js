@@ -1,5 +1,41 @@
+//#############################################################
+// general ui settings
+//#############################################################
 
 const userCanDropObjects=true;
+var showCoords=true;  // show logical coords of nearest road to mouse pointer
+                      // definition => showLogicalCoords(.) in canvas_gui.js
+                      // application: here at drawSim (7):  
+//#############################################################
+// general debug settings (set=false for public deployment)
+//#############################################################
+
+drawRoadIDs=false; // override control_gui.js; 
+drawVehIDs=false;  // override control_gui.js;
+                   // need to call later road.drawVehIDs=drawVehIDs
+
+var debug=false;   // if true, then sim stops at crash (only for testing)
+var crashinfo=new CrashInfo(); // need to include debug.js in html
+                               // use it in updateSim (4)
+
+// test truck uphill overtaking ban;
+// action done by control_gui.js -> updateModelsUphill()
+// ban begins at rel pos uBeginBanRel
+// comment out for production (start w/o ban)
+
+toggleTruckOvertakingBan();
+
+// relevant model in control_gui.js:
+// LCModelTruckUphill=(banIsActive) ? LCModelMandatory : LCModelTruck;
+
+//#############################################################
+// stochasticity settings (acceleration noise spec at top of models.js)
+//#############################################################
+
+var driver_varcoeff=0.15; //v0 and a coeff of variation (of "agility")
+                          // need later override road setting by
+                          // calling road.setDriverVariation(.); 
+
 
 //#############################################################
 // override standard param settings from control_gui.js
@@ -15,7 +51,7 @@ setSlider(slider_fracTruck, slider_fracTruckVal, 100*fracTruck, 0, "%");
 timewarp=5; //  default 6 in control_gui.js
 setSlider(slider_timewarp, slider_timewarpVal, timewarp, 0, "times");
 
-qIn=2500./3600; //2500./3600;
+qIn=2400./3600; //2500./3600;
 setSlider(slider_qIn, slider_qInVal, 3600*qIn, 0, "veh/h");
 
 IDM_a=1.5; // high to allow passing cars if truck overtaking ban active
@@ -116,7 +152,7 @@ var arcRadius=arcRadiusRel*refSizePhys;
 var arcLen=arcRadius*Math.PI;
 var straightLen=refSizePhys*critAspectRatio-center_xPhys;
 var mainroadLen=arcLen+2*straightLen;
-var uBeginBanRel=0.1; //MT jun2019
+var uBeginBanRel=0.; // !!  0: right at the beginning
 var uminLC=uBeginBanRel*straightLen+1; // !!!pass to mainroad.uminLC once def.
 var uBeginBan=uBeginBanRel*straightLen; // truck overtaking ban if clicked active
 var uBeginUp=straightLen+0.3*arcLen;
@@ -185,10 +221,10 @@ function traj_y(u){ // physical coordinates
 
 var isRing=false;  // 0: false; 1: true
 var roadID=1;
-var speedInit=20; // IC for speed
-var fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
+speedInit=20; // IC for speed
+fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
 
-var speedInit=20; // m/s
+speedInit=20; // m/s
 
 var mainroad=new road(roadID,mainroadLen,laneWidth,nLanes_main,
 		      [traj_x,traj_y],
@@ -196,6 +232,10 @@ var mainroad=new road(roadID,mainroadLen,laneWidth,nLanes_main,
 
 network[0]=mainroad;  // network declared in canvas_gui.js
 
+for(var ir=0; ir<network.length; ir++){
+  network[ir].setDriverVariation(driver_varcoeff);//!!
+  network[ir].drawVehIDs=drawVehIDs;
+}
 
 mainroad.uminLC=uminLC;
 
@@ -339,6 +379,33 @@ function updateSim(){
   itime++;
   isSmartphone=mqSmartphone();
 
+  // (1a) Test code
+
+  if(false){
+    console.log(
+      "itime=",itime,
+      " banIsActive=",banIsActive,
+      " LCModelTruckUphill.bBiasRight=",LCModelTruckUphill.bBiasRight,
+      " LCModelMandatory.bBiasRight=",LCModelMandatory.bBiasRight,
+      "");
+  }
+  //if(time<38.5){
+  if(false){
+    for(var i=0; i<mainroad.veh.length; i++){
+      if (mainroad.veh[i].id==220){
+	var testveh=mainroad.veh[i];
+	console.log("time=",time," veh id=",testveh.id,
+		   " bBiasRight=",testveh.LCModel.bBiasRight,
+		   "");
+      }
+    }
+  }
+	
+
+
+
+  
+  
   // (2) transfer effects from slider interaction and mandatory regions
   // to the vehicles and models
 
@@ -360,9 +427,9 @@ function updateSim(){
     console.log("LCModelTruckUphill.bBiasRight=",LCModelTruckUphill.bBiasRight,
 		" LCModelTruck.bBiasRight=",LCModelTruck.bBiasRight);
   }
-    mainroad.setCFModelsInRange(uBeginUp,uEndUp,
+  mainroad.setCFModelsInRange(uBeginUp,uEndUp,
 				 longModelCarUphill,longModelTruckUphill);
-    mainroad.setLCModelsInRange(uBeginBan,uEndUp,
+  mainroad.setLCModelsInRange(uBeginBan,uEndUp,
 				 LCModelCarUphill,LCModelTruckUphill);
 
   // (2a) update moveable speed limits
@@ -457,7 +524,7 @@ function drawSim() {
   ctx.setTransform(1,0,0,1,0,0);
   if(drawBackground){
     if(hasChanged||(itime<=10) || (itime%50==0) || userCanvasManip
-      || (!drawRoad) || banButtonClicked){
+      || (!drawRoad) ||drawVehIDs || banButtonClicked){
       ctx.drawImage(background,0,0,canvas.width,canvas.height);
       backgroundJustDrawn=true; // MT 2020-01
       
@@ -477,13 +544,13 @@ function drawSim() {
 
     
   var changedGeometry=userCanvasManip || hasChanged||(itime<=1);
-  mainroad.draw(roadImg1,roadImg2,scale,changedGeometry);
+  mainroad.draw(roadImg1,roadImg2,changedGeometry);
 
 
  
   // (4) draw vehicles (obstacleImg here empty, only needed for interface)
 
-  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
   // (4a) draw traffic signs (banButtonClicked => control_gui.js) MT 2020-01
   //console.log("banButtonClicked=",banButtonClicked," banIsActive=",banIsActive);
@@ -493,12 +560,12 @@ function drawSim() {
     var sizeSignPix=0.1*refSizePix;
     var vOffset=1.4*nLanes_main*laneWidth; // in v direction, pos if right
 
-    var xPixUp=mainroad.get_xPix(uBeginUp,vOffset,scale);
-    var yPixUp=mainroad.get_yPix(uBeginUp,vOffset,scale);
-    var xPixEnd=mainroad.get_xPix(uEndUp,vOffset,scale);
-    var yPixEnd=mainroad.get_yPix(uEndUp,vOffset,scale);
-    var xPixBan=mainroad.get_xPix(uBeginBan+0.1*straightLen,-0.5*vOffset,scale);
-    var yPixBan=mainroad.get_yPix(uBeginBan+0.1*straightLen,-0.5*vOffset,scale);
+    var xPixUp=mainroad.get_xPix(uBeginUp,vOffset);
+    var yPixUp=mainroad.get_yPix(uBeginUp,vOffset);
+    var xPixEnd=mainroad.get_xPix(uEndUp,vOffset);
+    var yPixEnd=mainroad.get_yPix(uEndUp,vOffset);
+    var xPixBan=mainroad.get_xPix(uBeginBan+0.1*straightLen,-0.5*vOffset);
+    var yPixBan=mainroad.get_yPix(uBeginBan+0.1*straightLen,-0.5*vOffset);
 
         // center sign (the drawing coords denote the left upper corner)
 
@@ -520,7 +587,7 @@ function drawSim() {
   // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box
@@ -534,19 +601,14 @@ function drawSim() {
 
   displayTime(time,textsize);
 
+  // drawSim (7): show logical coordinates if activated
 
-    // (7) draw the speed colormap (as of 2020-01 drawColormap=false)
-
-  if(drawColormap){
-      displayColormap(0.22*refSizePix,
-                 0.43*refSizePix,
-                 0.1*refSizePix, 0.2*refSizePix,
-		 vmin_col,vmax_col,0,100/3.6);
+  if(showCoords&&mouseInside){
+    showLogicalCoords(xPixUser,yPixUser);
   }
 
+  // drawSim (8): reset/revert variables for the next step
 
-  // reset even-oriented graphic switches (MT 2020-01)
-  
   hasChanged=false; // window dimension has changed (responsive design)
   backgroundJustDrawn=false; // MT 2020-01 only redraw signs etc if necessary
   

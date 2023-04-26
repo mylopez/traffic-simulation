@@ -9,8 +9,9 @@
     <link href="css/styleSliders.css" rel="stylesheet" type="text/css" />
     <link href="css/styleTrafficSimulationDe.css" 
           rel="stylesheet" type="text/css"/>
+    <link rel="shortcut icon" type="image/jpg" href="./favicon.jpg">
     <script type="text/javascript" 
-            src="js/jquery-1.5.1.min.js">
+            src="js/jquery-1.12.4.min.js">
     </script>
 
 <title> Microsimulation of Traffic Flow: Kreisverkehr</title>
@@ -59,10 +60,11 @@ Open traffic-light control panel </button> </div>
 
 <!-- ############################################## -->
 <!-- choice boxes -->
+<!-- besides id there is also a name attribute but id is relevant-->
 <!-- ############################################## -->
 
 <div id="priorityDiv">
-    <select id="changePrioritySelect"
+    <select id="changePrioritySelect" name="changePrioritySelect"
 	    onchange="handleChangedPriority(this.selectedIndex)">
         <option> normale Vorfahrtsregeln</option>
         <option> Rechts vor Links</option>
@@ -79,25 +81,7 @@ Open traffic-light control panel </button> </div>
     </select>
 </div>
 
-<!--
-<div id="lanePlusDiv"><img width="100%" 
-     src="figs/autobahn_plus.png" onclick="addOneLane()"/>
-</div>
 
-<div id="laneMinusDiv"><img width="100%" 
-     src="figs/autobahn_minus.png" onclick="subtractOneLane()"/>
-</div>
--->
-
-<!--<div id="debugDiv"> <button onclick="mainroad.writeVehicleRoutes(0,1000)">Debug:
-  write mainroad veh routes</button>
-</div>
--->
-
-<!--<div id="debugDiv"> <button onclick="mainroad.writeNonregularVehicles()">Debug:
-  write mainroad vehicles</button>
-</div>
--->
 
 
 <!-- ############################################## -->
@@ -128,6 +112,7 @@ Open traffic-light control panel </button> </div>
 
 <img width="20%" src="figs/iconRampmeterFig_small.jpg" 
                  onclick="myRedirectOnrampBaWue()"/>
+<a href="./test1_straight.html">Tests</a>
 </center>
 
 
@@ -348,6 +333,7 @@ Open traffic-light control panel </button> </div>
 
 <script src="js/paths.js"></script>
 <script src="js/road.js"></script>
+<script src="js/debug.js"></script>
 <script src="js/stationaryDetector_ger.js"></script> 
 
 <!-- PROJ--> <script src="js/roundabout_ger.js"></script> 

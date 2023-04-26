@@ -12,8 +12,8 @@ var showCoords=true;  // show logical coords of nearest road to mouse pointer
 // general debug settings (set=false for public deployment)
 //#############################################################
 
-drawVehIDs=true; // override control_gui.js
-drawRoadIDs=true; // override control_gui.js
+drawVehIDs=false; // override control_gui.js
+drawRoadIDs=false; // override control_gui.js
 var debug=false;
 var crashinfo=new CrashInfo();
 
@@ -28,7 +28,6 @@ var crashinfo=new CrashInfo();
 // controlled by a html select elements
 
 respectRingPrio=true; 
-//respectRightPrio=false; // callback: control_gui - handleChangedPriority
 
 
 // merging fine tuning
@@ -52,26 +51,26 @@ MOBIL_mandat_bias=2; // normal: bias=0.1, rFirst: bias=42
 MOBIL_mandat_p=0;  // normal: p=0.2, rFirst: p=0;
 
 
-//OD settings (depend addtl on slider-controlled mainFrac)
+//OD settings 
 // all 9 ODs equal: leftTurnBias=focusFrac=0,mainFrac=1
 // only left: leftTurnBias=focusFrac=1 
 // only center: leftTurnBias=0, focusFrac=1
 // with |leftTurnBias|>2/3, focusFrac becomes counterintuitive
 
-leftTurnBias=0;  // in [-1,1]
-focusFrac=1; // in [0,1]
-
+leftTurnBias=0;  // in [-1,1] // also set html choicebox accordingly!
+focusFrac=0; // in [0,1]
+setCombobox("ODSelect","3"); //{straight ahead, right, left, all directions} 
 
 // define non-standard slider initialisations
 // (no s0,LC sliders for roundabout)
 
-qIn=2000./3600;
+qIn=2600./3600;
 setSlider(slider_qIn,slider_qInVal,3600*qIn,0," veh/h");
 
 mainFrac=0.6;
 setSlider(slider_mainFrac,slider_mainFracVal,100*mainFrac,0," %");
 
-timewarp=2.5;
+timewarp=3.2;
 setSlider(slider_timewarp,slider_timewarpVal,timewarp,1," times");
 
 IDM_v0=50./3.6;
@@ -421,12 +420,12 @@ for(var ir=0; ir<nLanes.length; ir++){
 // road with passive merge/diverge: nothing needs to be added
 // road with active merge (ramp): road.mergeDiverge at sim time
 // road with active diverge (mainroad, when routes are relevant): 
-//   road.setOfframpInfo at init time and road.mergeDiverge at sim time
+// road.initMergeDiverge at init time and road.mergeDiverge at sim time
 
 //##################################################################
 
 
-var speedInit=20; // m/s
+speedInit=20; // m/s
 var density=0.00;
 
 //new road(ID,length,laneWidth,nLanes,traj_x,traj_y,
@@ -545,6 +544,9 @@ function updateSim(){
   hasChanged=false;
 
 
+  
+  //!!! check why here and not in the other scenarios
+
   if ((canvas.width!=simDivWindow.clientWidth)
       ||(canvas.height != simDivWindow.clientHeight)){
     hasChanged=true; // only pixel; physical changes in updateSim
@@ -653,14 +655,13 @@ function updateSim(){
 
   var maxspeed_turn=7;
 
-  // arms to ring
-  // respectRingPrio set by html choice element
-  
   var duMerge=network[1].roadLen-uMerge; // merge du before the end of the arm
   var mergeOffset  =-rRing*stitchAngleOffset - duMerge;
   var divergeOffset=-rRing*stitchAngleOffset + 0;
   
-  //console.log("0.25*PI+mergeOffset/rRing=",0.25*PI+mergeOffset/rRing);
+  
+  // merge: arms to ring
+  // respectRingPrio set by html choice element
   
   // connect(targetRoad,uSource,uTarget,offsetLane,conflicts(opt),speed(opt))
   network[0].connect(network[8], uMerge, // E arm
@@ -681,6 +682,7 @@ function updateSim(){
 
 
   
+  // diverge:
   // ring to arms (vehicles know by their routes on which arm to leave)
 
   // connect(targetRoad,uSource,uTarget,offsetLane,conflicts(opt),speed(opt))
@@ -764,24 +766,24 @@ function drawSim() {
   var changedGeometry=userCanvasManip || hasChanged||(itime<=1);
   for(var ir=0; ir<network.length; ir++){
     network[ir].draw(roadImages[ir][0],roadImages[ir][1],
-		    scale,changedGeometry);
+		    changedGeometry);
   }
 
   if(drawRoadIDs){  
     for(var ir=0; ir<network.length; ir++){
-      network[ir].drawRoadID(scale);
+      network[ir].drawRoadID();
     }
   }
 
    
   // (4) draw vehicles !! degree of smooth changing: fracLaneOptical
 
-  // road.drawVehicles(carImg,truckImg,obstImgs,scale,vmin_col,vmax_col,
+  // road.drawVehicles(carImg,truckImg,obstImgs,vmin_col,vmax_col,
   //           umin,umax,movingObserver,uObs,center_xPhys,center_yPhys)
   // second arg line optional, only for moving observer
 
   for(var ir=0; ir<network.length; ir++){
-    network[ir].drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    network[ir].drawVehicles(carImg,truckImg,obstacleImgs,
 			    vmin_col,vmax_col);
   }
 
@@ -790,7 +792,7 @@ function drawSim() {
   // (zoomback is better in sim!)
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   ctx.setTransform(1,0,0,1,0,0); // speedlimit-change select box

@@ -145,9 +145,7 @@ var scale=refSizePix/refSizePhys;
 
 
 var hasChanged=true; // window or physical dimensions have changed
-var hasChangedPhys=true; // physical road dimensions have changed 
-                          // in last updateDimensions
-                          // (only true when switching from/to mobile version)
+
 
 //<NETWORK>
 //##################################################################
@@ -196,7 +194,6 @@ trajNet[0]=traj;
 
 // define/redefine geometry, trajectories
 
-hasChangedPhys=true;
 updateDimensions();
 
 function updateDimensions(){ // if viewport or sizePhys changed
@@ -209,9 +206,8 @@ function updateDimensions(){ // if viewport or sizePhys changed
   center_yPhys=center_yRel*refSizePhys;
 
   // redefine basis of traj*_x, traj*_y or traj_x[], traj_y[]
-  // if hasChangedPhys=true
 
-  if(hasChangedPhys){
+  if(true){  // formerly hasChangedPhys
     arcRadius=arcRadiusRel*refSizePhys;
     arcLen=arcRadius*Math.PI;
     straightLen=refSizePhys*critAspectRatio-center_xPhys+hideFirst_m;
@@ -233,8 +229,7 @@ function updateDimensions(){ // if viewport or sizePhys changed
   
   if(true){
     console.log("updateDimensions: mainroadLen=",mainroadLen,
-		" isSmartphone=",isSmartphone, 
-		" hasChangedPhys=",hasChangedPhys);
+		" isSmartphone=",isSmartphone);
   }
 }
 
@@ -258,7 +253,7 @@ var truck_width=30; // irrelevant but needed in road.js
 var isRing=false;  // 0: false; 1: true
 var roadIDmain=1;
 
-var speedInit=1; // IC for speed
+speedInit=1; // IC for speed
 
 var mainroad=new road(roadIDmain,mainroadLen,laneWidth,nLanes_main,
 		      traj,
@@ -437,10 +432,9 @@ function updateSim(){
 
     if(isSmartphone!=mqSmartphone()){
       isSmartphone=mqSmartphone();
-      hasChangedPhys=true;
     }
 
-    updateDimensions(); // updates refsizePhys, -Pix, scale, geometry
+    updateDimensions(); // updates refsizePhys, -Pix,  geometry
  
     if(true){
       console.log("updateSim: haschanged=true: new canvas dimension: ",
@@ -632,7 +626,7 @@ function drawSim() {
   var changedGeometry=userCanvasManip || hasChanged||(itime<=1)||true; 
 
 
-  mainroad.draw(roadImg1,roadImg2,scale,changedGeometry,
+  mainroad.draw(roadImg1,roadImg2,changedGeometry,
 		0,mainroad.roadLen,
 		movingObserver,uObs,center_xPhys,center_yPhys);
 
@@ -651,7 +645,7 @@ function drawSim() {
   // (relevant in coffeemeterGame, only), too
 
   var upright=true; // golfers shout not be upside down
-  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,
 			vmin_col,vmax_col,
 			0,mainroad.roadLen,
 			movingObserver,uObs,center_xPhys,center_yPhys,upright);
@@ -676,7 +670,7 @@ function drawSim() {
     ctx.setTransform(1,0,0,1,0,0); 
     var textsize=0.02*Math.min(canvas.width,canvas.height); // 2vw;
     ctx.font=textsize+'px Arial';
-    var scaleStr=" scale="+Math.round(10*scale)/10;
+    var scaleStr=" scale="+Math.round(10*)/10;
     var scaleStr_xlb=9*textsize;
     var scaleStr_ylb=timeStr_ylb;
     var scaleStr_width=5*textsize;
@@ -711,7 +705,6 @@ function drawSim() {
   // (updateDimensions) or if old sign should be wiped away 
 
   hasChanged=false;
-  hasChangedPhys=false; 
 
   // revert to neutral transformation at the end!
 

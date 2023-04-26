@@ -2,6 +2,17 @@
 // longitudinal models
 //#################################
 
+// white acceleration noise to avoid artifacts.
+// sqrt(QnoiseAccel/dt) = random accel noise in each step
+
+var QnoiseAccel=0.05; //[m^2/s^3]
+
+// note: correlated noise by inter-driver variation directly in model
+// ACC.driverfactor or IDM.driverfactor
+// inherited from this.veh[i].driverfactor in road.js
+// which is calculated from top-level driver_varcoeff
+// via road.setDriverVariation(driver_varcoeff)
+
 
 /**
 longModel-IDM constructor
@@ -27,23 +38,27 @@ deep copy: longModel2=new IDM(); longModel2.copy(longModel)
 @return:      IDM instance (constructor)
 */
 
- 
-function IDM(v0,T,s0,a,b){
-    this.v0=v0; 
-    this.T=T;
-    this.s0=s0;
-    this.a=a;
-    this.b=b;
-    this.alpha_v0=1; // multiplicator for temporary reduction
-    this.noiseAcc=0.3; // ad-hoc accel noise per step to avoid some artifacts
-                       //!!! no random walk noiseAcc propto sqrt(Qacc*dt)
-                       // implemented!!
+// generally ACC is used; check for "new ACC" and "new IDM" in road.js
 
-    // possible restrictions (value 1000 => initially no restriction)
+function IDM(v0,T,s0,a,b){ 
 
-    this.speedlimit=1000; // if effective speed limits, speedlimit<v0  
-    this.speedmax=1000; // if engine restricts speed, speedmax<speedlimit, v0
-    this.bmax=18; //(2022) was=16
+  
+  this.QnoiseAccel=QnoiseAccel; //m^2/s^3
+
+  this.driverfactor=1; // if no transfer of driver individuality from master veh
+  this.v0=v0;
+  this.T=T;
+  this.s0=s0;
+  this.a=a;
+  this.b=b;
+  this.alpha_v0=1; // multiplicator for temporary reduction
+
+  
+  // possible restrictions (value 1000 => initially no restriction)
+
+  this.speedlimit=1000; // if effective speed limits, speedlimit<v0  
+  this.speedmax=1000; // if engine restricts speed, speedmax<speedlimit, v0
+  this.bmax=18; //(2022) was=16
 }
 
 /**
@@ -55,17 +70,20 @@ reference-side effects
 @param already defined longModel (at the moment, IDM or ACC)
 @return:      IDM instance (constructor)
 
+usage: IDM2=new IDM(); IDM2.copy(IDM1);
+
 */
 
 IDM.prototype.copy=function(longModel){
-  this.v0=longModel.v0; 
+  this.QnoiseAccel=longModel.QnoiseAccel;
+  
+  this.v0=longModel.v0;  // driverfactor not copied; from master vehicle
   this.T=longModel.T;
   this.s0=longModel.s0;
   this.a=longModel.a;
   this.b=longModel.b;
 
   this.alpha_v0=1; // multiplicator for temporary reduction
-  this.noiseAcc=longModel.noiseAcc;
 
   this.speedlimit=longModel.speedlimit; 
   this.speedmax=longModel.speedmax; // if engine restricts speed, speedmax<speedlimit, v0
@@ -85,31 +103,39 @@ IDM acceleration function
 @return:  acceleration [m/s^2]
 */
 
-
 IDM.prototype.calcAcc=function(s,v,vl,al){ 
+    // sig_speedFluct=noiseAccel*sqrt(t*dt/12)
 
-        //MT 2016,2022: noise to avoid some artifacts
+  var accRnd=(s<this.s0) ? 0
+      : Math.sqrt(this.QnoiseAccel/dt)*(Math.random()-0.5);
+  return accRnd+this.calcAccDet(s,v,vl,al);
+}
 
-    var accRnd=this.noiseAcc*(Math.random()-0.5); //if acceleration noise
 
-        // determine valid local v0
+IDM.prototype.calcAccDet=function(s,v,vl,al){ 
 
-    var v0eff=Math.min(this.v0, this.speedlimit, this.speedmax);
-    v0eff*=this.alpha_v0;
+  
+  // determine valid local v0eff and accel parameter aeff
+  // this.driverfactor from master vehicle;
+  // speedlimit overrides driver variability
+  
+  var v0eff=this.v0*this.driverfactor;
+  v0eff=Math.min(v0eff, this.speedlimit, this.speedmax);
+  var aeff=a*this.driverfactor;
 
         // actual acceleration model
 
-    var accFree=(v<v0eff) ? this.a*(1-Math.pow(v/v0eff,4))
-	: this.a*(1-v/v0eff);
-    var sstar=this.s0
-	+Math.max(0.,v*this.T+0.5*v*(v-vl)/Math.sqrt(this.a*this.b));
-    var accInt=-this.a*Math.pow(sstar/Math.max(s,this.s0),2);
-    var accInt_IDMplus=accInt+this.a;
+  var accFree=(v<v0eff) ? aeff*(1-Math.pow(v/v0eff,4))
+	: aeff*(1-v/v0eff);
+  var sstar=this.s0
+	+Math.max(0.,v*this.T+0.5*v*(v-vl)/Math.sqrt(aeff*this.b));
+  var accInt=-aeff*Math.pow(sstar/Math.max(s,this.s0),2); //!!! also for s<0?
+  var accInt_IDMplus=accInt+aeff;
 
         // return original IDM
 
-    return (v0eff<0.00001) ? 0 
-	: Math.max(-this.bmax, accFree + accInt + accRnd);
+  return (v0eff<0.00001) ? 0 
+	: Math.max(-this.bmax, accFree + accInt);
 
         // return IDM+
 
@@ -129,8 +155,10 @@ if this does not include an emergency braking (decel<2*b)
 For the interface and further explanations see ACC.prototype.calcAcc
 */
 
+// deterministic acc for all forced situations
+
 IDM.prototype.calcAccGiveWay=function(sNew, v, vPrio){
-    var accNew=this.calcAcc(sNew, v, vPrio, 0);
+    var accNew=this.calcAccDet(sNew, v, vPrio, 0);
     return (accNew>-2*this.b) ? accNew : acc;
 }
 
@@ -161,8 +189,16 @@ function myTanh(x){
     return (x>50) ? 1 : (x<-50) ? -1 : (Math.exp(2*x)-1)/(Math.exp(2*x)+1);
 }
 
+// generally ACC is used; check for "new ACC" and "new IDM" in road.js
 
 function ACC(v0,T,s0,a,b){
+
+  // white acceleration noise to avoid artifacts.
+  // sqrt(QnoiseAccel/dt) = random accel noise in each step
+  // for uncorrelated random effects
+
+  this.QnoiseAccel=QnoiseAccel; //m^2/s^3
+  this.driverfactor=1; // if no transfer of driver individuality from master veh
   this.v0=v0; 
   this.T=T;
   this.s0=s0;
@@ -171,13 +207,9 @@ function ACC(v0,T,s0,a,b){
 
   this.cool=0.90; // !!also apply to copy constructor
 
-  // ad-hoc accel noise per step to avoid some artifacts
-  // !!! no random walk noiseAcc propto sqrt(Qacc*dt) implemented!!
-  // !!!! can interfere with MOBIL!
-  // consider implementing calcAccDet for MOBIL use
-  this.noiseAcc=0.3;
-  
   this.alpha_v0=1; // multiplicator for temporary reduction
+    
+  // possible restrictions (value 1000 => initially no restriction)
 
   this.speedlimit=1000; // if effective speed limits, speedlimit<v0  
   this.speedmax=1000; // if vehicle restricts speed, speedmax<speedlimit, v0
@@ -192,6 +224,11 @@ used to define models individually rather than by reference.
 Only then, speed limits etc can be implemented "on the fly" w/o 
 reference-side effects
 
+Since models often are deep copied from a template and I want persistent
+stochasticity of model parameter variations, model gets its 
+persistent stochasticity from the vehicle because models are often created
+new during sim -> all persistency destroyed
+
 @param already defined longModel (at the moment, IDM or ACC)
 @return:      IDM instance (constructor)
 
@@ -200,18 +237,19 @@ usage: ACC2=new ACC(); ACC2.copy(ACC1);
 */
 
 ACC.prototype.copy=function(longModel){
-  this.v0=longModel.v0; 
+  this.QnoiseAccel=longModel.QnoiseAccel;
+
+  this.v0=longModel.v0; // driverfactor not copied; from master vehicle
   this.T=longModel.T;
   this.s0=longModel.s0;
   this.a=longModel.a;
   this.b=longModel.b;
-
-  // this.cool comes from cstr since not all longModels have .cool
+  this.cool=(!(typeof longModel.cool === 'undefined')) ? longModel.cool : 0.8;
 
   this.alpha_v0=1; // multiplicator for temporary reduction
-  this.noiseAcc=longModel.noiseAcc;
 
-    // possible restrictions (value 1000 => initially no restriction)
+  // possible restrictions (value 1000 => initially no restriction)
+  
   this.speedlimit=longModel.speedlimit; 
   this.speedmax=longModel.speedmax; // if engine restricts speed, speedmax<speedlimit, v0
   this.bmax=longModel.bmax;
@@ -231,41 +269,53 @@ ACC acceleration function
 @return:  acceleration [m/s^2]
 */
 
-
 ACC.prototype.calcAcc=function(s,v,vl,al){ // this works as well
+    // sig_speedFluct=noiseAccel*sqrt(t*dt/12)
 
-  if(s<0.5*this.s0){return -this.bmax;}// particularly for s<0
+  var accRnd=(s<this.s0) ? 0
+      : Math.sqrt(this.QnoiseAccel/dt)*(Math.random()-0.5);
+  return accRnd+this.calcAccDet(s,v,vl,al);
+}
 
-    // !!! acceleration noise to avoid some artifacts (no noise if s<s0)
-    // sig_speedFluct=noiseAcc*sqrt(t*dt/12)
+ACC.prototype.calcAccDet=function(s,v,vl,al){ // this works as well
 
-  var accRnd= (s<this.s0) ? 0 : this.noiseAcc*(Math.random()-0.5);
+  // special simple case for s<s0 particularly for s<0
+  // (IDM does not need this)
+  
+  if(s<this.s0){
+    return Math.max(-this.bmax,
+		    -(this.b+(this.bmax-this.b)*(this.s0-s)/this.s0)
+		   );}
 
-        // determine valid local v0
 
-  var v0eff=Math.min(this.v0, this.speedlimit, this.speedmax);
-  v0eff*=this.alpha_v0;
-
-        // actual acceleration model
+  // determine valid local v0eff and accel parameter aeff
+  // this.driverfactor from master vehicle;
+  // speedlimit overrides driver variability
+  
+  var v0eff=this.v0*this.driverfactor;
+  v0eff=Math.min(v0eff, this.speedlimit, this.speedmax);
+  var aeff=this.a*this.driverfactor;
+  
+  // actual acceleration model
 
   // !!! no strong response for v>v0
-  //var accFree=(v<v0eff) ? this.a*(1-Math.pow(v/v0eff,4))
-  //  : this.a*(1-v/v0eff); 
+  //var accFree=(v<v0eff) ? aeff*(1-Math.pow(v/v0eff,4))
+  //  : aeff*(1-v/v0eff); 
 
   // !!! strong response wanted for baWue application (dec19)
-  var accFree=this.a*(1-Math.pow(v/v0eff,4));
+  var accFree=aeff*(1-Math.pow(v/v0eff,4));
 
   var sstar=this.s0
-    +Math.max(0, v*this.T+0.5*v*(v-vl)/Math.sqrt(this.a*this.b));
-  var accInt=-this.a*Math.pow(sstar/Math.max(s,this.s0),2);
+    +Math.max(0, v*this.T+0.5*v*(v-vl)/Math.sqrt(aeff*this.b));
+  var accInt=-aeff*Math.pow(sstar/Math.max(s,this.s0),2);
 
   //var accIDM=accFree+accInt; //!!! normal IDM
-  var accIDM=Math.min(accFree, this.a+accInt); //!!! IDM+
+  var accIDM=Math.min(accFree, aeff+accInt); //!!! IDM+
 
   var accCAH=(vl*(v-vl) < -2*s*al)
     ? v*v*al/(vl*vl -2*s*al)
     : al - Math.pow(v-vl,2)/(2*Math.max(s,0.01)) * ((v>vl) ? 1 : 0);
-  accCAH=Math.min(accCAH,this.a);
+  accCAH=Math.min(accCAH,aeff);
 
   var accMix=(accIDM>accCAH)
 	    ? accIDM
@@ -274,7 +324,7 @@ ACC.prototype.calcAcc=function(s,v,vl,al){ // this works as well
 
   var accACC=this.cool*accMix +(1-this.cool)*accIDM;
 
-  var accReturn=(v0eff<0.00001) ? 0 : Math.max(-this.bmax, accACC + accRnd);
+  var accReturn=(v0eff<0.00001) ? 0 : Math.max(-this.bmax, accACC);
 
         // log and return
 
@@ -313,10 +363,6 @@ having priority.
 Notice 2: No actual lane change is involved. The lane change of the merging vehicle
 is just favoured in the next steps by this longitudinal-transversal coupling
 
-Notice 3: For active merges to priority roads 
-(the mainroad vehicles have priority) 
-use MOBIL.respectPriority to determine if the merge is OK
-
 
 @param sYield: distance [m] to yield point 
                (stop if merging veh present)
@@ -328,12 +374,11 @@ use MOBIL.respectPriority to determine if the merge is OK
 @return:  acceleration response [m/s^2] to the merging veh with priority
 */
 
-    // !! 0.1*this.b consistent with MOBIL.prototype.respectPriority
-    // !! 2*this.b consistent with MOBIL.bSafe
+
 
 ACC.prototype.calcAccGiveWay=function(sYield, sPrio, v, vPrio, accOld){
-    var accPrioNoYield=this.calcAcc(sPrio, vPrio, 0, 0);
-    var accYield=this.calcAcc(sYield, v, 0, 0);
+    var accPrioNoYield=this.calcAccDet(sPrio, vPrio, 0, 0);
+    var accYield=this.calcAccDet(sYield, v, 0, 0);
     var priorityRelevant=((accPrioNoYield<-0.2*this.b)
 			  &&(accYield<-0.2*this.b));
     var accGiveWay=priorityRelevant ? accYield : accOld;
@@ -392,32 +437,34 @@ but at present w/o politeness
 MOBIL.prototype.realizeLaneChange=function(vrel,acc,accNew,accLagNew,
 					   toRight,log){
 
-    var signRight=(toRight) ? 1 : -1;
+  var signRight=(toRight) ? 1 : -1;
 
-    // safety criterion
+  // safety criterion
 
-    var bSafeActual=vrel*this.bSafe+(1-vrel)*this.bSafeMax;
-    //if(accLagNew<-bSafeActual){return false;} //!! <jun19
-    //if((accLagNew<-bSafeActual)&&(signRight*this.bBiasRight<41)){return false;}//!!! override safety criterion to really enforce overtaking ban OPTIMIZE
-    if(signRight*this.bBiasRight>40){
+  var bSafeActual=vrel*this.bSafe+(1-vrel)*this.bSafeMax;
+
+  if(signRight*this.bBiasRight>40){
       //console.log("forced LC!"); 
       return true;
-    }
-    if(accLagNew<Math.min(-bSafeActual,-Math.abs(this.bBiasRight))){return false;}//!!!
+  }
+  
+  if(accLagNew<Math.min(-bSafeActual,-Math.abs(this.bBiasRight))){
+    return false;
+  }//!!!
     
 
-    // incentive criterion
+  // incentive criterion true if acc balance dacc>0
 
-    var dacc=accNew-acc+this.p*accLagNew //!! new
-	+ this.bBiasRight*signRight - this.bThr;
+  var dacc=accNew-acc+this.p*accLagNew //!! new
+      + this.bBiasRight*signRight - this.bThr;
 
-    // hard-prohibit LC against bias if |bias|>9 m/s^2
+  // hard-prohibit LC against bias if |bias|>9 m/s^2
     
-    if(this.bBiasRight*signRight<-9){dacc=-1;}
+  if(this.bBiasRight*signRight<-9){dacc=-1;}
 
     // debug before return
 
-    if(false){
+  if(false){
     //if((dacc>0)&&(!toRight)){
 	console.log(
 		"!!!!! positive left MOBIL LC decision!",
@@ -428,26 +475,12 @@ MOBIL.prototype.realizeLaneChange=function(vrel,acc,accNew,accLagNew,
 		" bBiasRight=",parseFloat(this.bBiasRight).toFixed(2),
 		" bThr=",parseFloat(this.bThr).toFixed(2)
 	);
-    }
+  }
 
-
-
-    return (dacc>0);
+  return (dacc>0);
 }
 
 
-
-/**
-check first for priority if merging to a priority lane.
-In contrast to the safety criterion (critical deceleration), 
-the criterion here is a rather small critical acceleration *change*
-
-@param accLag:    actual acceleration of the target lag vehicle
-@param accLagNew: acceleration of this vehicle after a prospective change
-
-@return:          true if the mainroad (target lane) vehicle would be obstructed by
-                  the changing by more than a very small amount
-*/
 
 // to be used in connection with new, e.g., at inflow:
 // LCModel2=new MOBIL(); LCModel2.copy(LCModel1)
@@ -460,3 +493,21 @@ MOBIL.prototype.copy=function(LCModel){
   this.bBiasRight=LCModel.bBiasRight;
 }
 
+/*
+check first for priority if merging to a priority lane.
+In contrast to the safety criterion (critical deceleration), 
+the criterion here is a rather small critical acceleration *change*
+
+@param accLag:    actual acceleration of the target lag vehicle
+@param accLagNew: acceleration of this vehicle after a prospective change
+
+@return:          true if the mainroad (target lane) vehicle would be obstructed by
+                  the changing by more than a very small amount
+*/
+
+MOBIL.prototype.respectPriority=function(accLag,accLagNew){
+
+    if(this.targetLanePrio){
+	return(accLag-accLagNew>0.1);
+    }
+}

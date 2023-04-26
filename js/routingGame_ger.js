@@ -384,12 +384,12 @@ function trajRamp_y(u){ // physical coordinates
 //##################################################################
 
 
-var speedInit=20; // m/s
+speedInit=20; // m/s
 var density=0.001;
-var fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
+fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
 
 var isRing=false; 
-duTactical=300; // anticipation distance for applying mandatory LC rules
+var duTactical=300; // anticipation distance for applying mandatory LC rules
 
 var mainroad=new road(1,mainroadLen,laneWidth,nLanes_main,
 		      [traj_x,traj_y],
@@ -401,11 +401,16 @@ network[0]=mainroad;  // network declared in canvas_gui.js
 network[1]=ramp;
 
 
-var offrampIDs=[2];
-var offrampLastExits=[umainDiverge+lrampDev];
-var offrampToRight=[true];
-mainroad.setOfframpInfo(offrampIDs,offrampLastExits,offrampToRight);
 mainroad.duTactical=duTactical;
+
+var targets=[ramp];  // array with one element 2
+var isMerge=[false];
+var mergeDivergeLen=[lrampDev];
+var uLast=[umainDiverge+lrampDev];
+var offrampToRight=[true];
+
+mainroad.initMergeDiverge(targets,isMerge,
+			  mergeDivergeLen,uLast,offrampToRight);
 
 
 //############################################
@@ -735,24 +740,24 @@ function drawSim() {
     var changedGeometry=userCanvasManip || hasChanged||(itime<=1); 
     //var changedGeometry=false; 
 
-    ramp.draw(rampImg,rampImg,scale,changedGeometry);
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+    ramp.draw(rampImg,rampImg,changedGeometry);
+    ramp.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
-    mainroad.draw(roadImg1,roadImg2,scale,changedGeometry);
+    mainroad.draw(roadImg1,roadImg2,changedGeometry);
 
-    mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+    mainroad.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
     // redraw first/last deviation vehicles obscured by mainroad drawing
  
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    ramp.drawVehicles(carImg,truckImg,obstacleImgs,
 			  vmin_col,vmax_col,0,lrampDev);
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    ramp.drawVehicles(carImg,truckImg,obstacleImgs,
 			   vmin_col,vmax_col,lDev-lrampDev, lDev);
 
   // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box

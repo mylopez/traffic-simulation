@@ -164,13 +164,13 @@ function TrafficObjects(canvas,nTL,nLimit,xRelDepot,yRelDepot,nRow,nCol){
     
     var img=(isTL) ? this.imgTLred : (isSpeedl)
       ? this.imgSpeedlRepo[initSpeedInd[iSpeed]] : this.imgObstRepo[iObst];
-    if(true){
+    if(false){
       console.log("TrafficObjects cstr: i=",i,
 		  " img=",img," iObst=",iObst);
     }
 
     //#################################################################
-    // xxx central object this.trafficObj[i]
+    // central object this.trafficObj[i]
     // object on road: isActive=true, u>=0,inDepot=isDragged=false 
     // object picked: isPicked=true, inDepot=false, isDragged and isActive
     //         can have both values 
@@ -512,8 +512,8 @@ TrafficObjects.prototype.activate=function(obj, road, u){
     obj.u=u;
     //obj.lane=0.5*road.nLanes; // center, v=0
     obj.lane=0; // !!! 
-    obj.xPix=road.get_xPix(u,0,scale);
-    obj.yPix=road.get_yPix(u,0,scale);
+    obj.xPix=road.get_xPix(u,0);
+    obj.yPix=road.get_yPix(u,0);
     obj.inDepot=false;
     obj.isPicked=false;
     obj.isDragged=false;
@@ -602,12 +602,17 @@ calculate x,y by roads's trajectory and u and apply this.dropObject
 
 // needs global physical coordinates xUser yUser
 TrafficObjects.prototype.dropObject=function(obj, network, 
-				    xUser, yUser, distCritPix, scale){
+				    xUser, yUser, distCritPix, ){
 
-  console.log("itime=",itime
-	      ," in TrafficObjects.dropObject: obj.id=",obj.id,
-	      " obj.xPix=",obj.xPix,
-	      " network[0].roadID=",network[0].roadID);
+  if(false){
+    console.log("itime=",itime
+	        ," in TrafficObjects.dropObject: obj.id=",obj.id,
+	        " obj.xPix=",obj.xPix,
+	        " network[0].roadID=",network[0].roadID);
+    console.log("inside dropObject begin: this.trafficObj[0]=",
+		this.trafficObj[0]);
+  }
+  
   // transform pointer to physical coordinates since road geometry
   // defined in these coordinates
   
@@ -662,10 +667,10 @@ TrafficObjects.prototype.dropObject=function(obj, network,
   // pick obstacles at center => at position u-du
 
   if(success){
-    console.log("  success! roadID=",obj.road.roadID,
-		" obj.u=",obj.u," obj.lane=",obj.lane);
-    obj.xPix=road.get_xPix(obj.u-du, obj.lane, scale);
-    obj.yPix=road.get_yPix(obj.u-du, obj.lane, scale);
+    //console.log("  success! roadID=",obj.road.roadID,
+    //		" obj.u=",obj.u," obj.lane=",obj.lane);
+    obj.xPix=road.get_xPix(obj.u-du, obj.lane);
+    obj.yPix=road.get_yPix(obj.u-du, obj.lane);
   }
 
 
@@ -676,15 +681,19 @@ TrafficObjects.prototype.dropObject=function(obj, network,
   }
 
 
-  if(true){
+  if(false){
     console.log("  end TrafficObjects.dropObject: success=",success,
 		" nearest roadID=",road.roadID,
 	        " road.roadLen=",formd(road.roadLen),
-	        " obj.id=",obj.id,
-	        " obj.u=",formd(obj.u),
-	        " obj.xPix=",formd0(obj.xPix),
+		" obj=",obj,
+	        //" obj.id=",obj.id,
+	        //" obj.u=",formd(obj.u),
+	        //" obj.xPix=",formd0(obj.xPix),
 		"");
+    console.log("inside dropObject end: this.trafficObj[0]=",
+		this.trafficObj[0]);
   }
+
 
 } // dropObject
 
@@ -765,6 +774,7 @@ TrafficObjects.prototype.selectSignOrTL=function(xPixUser,yPixUser){
 
 TrafficObjects.prototype.setTrafficLight=function(obj, value){
 
+  //console.log("in TrafficObjects.setTrafficLight, obj=",obj," value=",value);
   if(!(obj.type==='trafficLight')){
     console.log("TrafficObjects.setTrafficLight: error:",
 		" object not of type trafficLight");
@@ -835,6 +845,37 @@ should also be called if clicked but not dragged
   return success;
 
 }
+
+//#############################################################
+// programmatic setting of a speed limit
+//#############################################################
+
+/** 
+@param obj:    a TrafficObjects object of type "speedLimit"
+@param value:  the new value in km/h; 
+               will be rounded to multiples of 10 km/h or "free" if >=125
+@return:       changed state, if active, also changed road influence
+*/
+
+TrafficObjects.prototype.setSpeedlimit=function(obj, value){
+
+  if(!(obj.type==='speedLimit')){
+    console.log("TrafficObjects.setSpeedlimit: error:",
+		" object not of type speedLimit");
+    return;
+  }
+  
+  // translate value to image index
+
+  var index=Math.round(0.1*value);
+  if(value<5){index=1;}   // no 5 km/h image at present
+  if(value>=125){index=0;} // free sign/no speed limit
+  var usedLimit=(index>0) ? 10*index : 130; // "free"=130 km/h
+
+  obj.value=usedLimit;
+  obj.image=this.imgSpeedlRepo[index];
+}
+  
 
 /*####################################################################
 bring back all dragged trafficObj objects back to the depot 
@@ -909,7 +950,7 @@ TrafficObjects.prototype.writeObjects=function(onlyTL){
 		  " value=",obj.value,
 		  //" xPix=",formd0(obj.xPix),
 		 // " yPix=",formd0(obj.yPix),
-		 // " image=",obj.image,
+		  " image=",obj.image,
 		  " isActive=",obj.isActive,
 		 // " inDepot=",obj.inDepot,
 		 // " isPicked=",obj.isPicked,

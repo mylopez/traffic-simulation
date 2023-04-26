@@ -1,6 +1,42 @@
 
-//const userCanDistortRoads=false; //legacy 
+
+//#############################################################
+// general ui settings
+//#############################################################
+
 const userCanDropObjects=true;
+var showCoords=true;  // show logical coords of nearest road to mouse pointer
+                      // definition => showLogicalCoords(.) in canvas_gui.js
+
+//#############################################################
+// general debug settings (set=false for public deployment)
+//#############################################################
+
+drawVehIDs=false; // override control_gui.js
+drawRoadIDs=false; // override control_gui.js
+var debug=false;
+var crashinfo=new CrashInfo();
+
+
+//#############################################################
+// stochasticity settings (acceleration noise spec at top of models.js)
+//#############################################################
+
+var driver_varcoeff=0.15; //v0 and a coeff of variation (of "agility")
+                          // need later override road setting by
+                          // calling road.setDriverVariation(.); 
+
+
+//#############################################################
+// override standard settings control_gui.js
+//#############################################################
+
+density=0.03;  // default 0.03
+setSlider(slider_density, slider_densityVal, 1000*density, 0, "veh/km");
+
+fracTruck=0.1; // default 0.1 
+setSlider(slider_fracTruck, slider_fracTruckVal, 100*fracTruck, 0, "%");
+
 
 /*######################################################
  Global overall scenario settings and graphics objects
@@ -15,18 +51,9 @@ const userCanDropObjects=true;
 
  (2) refSizePhys smaller  => all phys roadlengths smaller
   => vehicles and road widths appear bigger for a given screen size 
-  => chose smaller for mobile, 
-
+  => chose smaller for mobile
 ######################################################*
 */
-
-// override standard dettings control_gui.js
-
-density=0.03;  // default 0.03
-setSlider(slider_density, slider_densityVal, 1000*density, 0, "veh/km");
-
-fracTruck=0.1; // default 0.1 
-setSlider(slider_fracTruck, slider_fracTruckVal, 100*fracTruck, 0, "%");
 
 
 // Global overall scenario settings and graphics objects
@@ -122,13 +149,15 @@ var trajIn=[trajIn_x,trajIn_y];
 
 var isRing=true;  // 0: false; 1: true
 var roadID=1;
-var speedInit=20; // IC for speed
-var fracTruckToleratedMismatch=0.02; // avoid sudden changes in open systems
-
+speedInit=20; // IC for speed
+fracTruckToleratedMismatch=0.02; // avoid sudden changes in open systems
 var mainroad=new road(roadID,mainroadLen,laneWidth,nLanes_main,trajIn,
 		      density,speedInit,fracTruck,isRing);
-network[0]=mainroad;  // network declared in canvas_gui.js
 
+mainroad.setDriverVariation(driver_varcoeff); //!!!
+
+network[0]=mainroad;  // network declared in canvas_gui.js
+network[0].drawVehIDs=drawVehIDs;
 
 
 //  introduce stationary detectors
@@ -138,7 +167,6 @@ for(var idet=0; idet<4; idet++){
   detectors[idet]=new stationaryDetector(mainroad,
 					  (0.125+idet*0.25)*mainroadLen,10);
 }
-
 
 
 //#########################################################
@@ -159,7 +187,7 @@ var hasChanged=true; // window dimensions have changed (responsive design)
 
 var drawBackground=true; // if false, default unicolor background
 var drawRoad=true; // if false, only vehicles are drawn
-var userCanvasManip=false; //!!! true only if user-driven geometry changes
+var userCanvasManip=false; //!! true only if user-driven geometry changes
 
 var drawColormap=false;
 var vmin_col=0; // min speed for speed colormap (drawn in red)
@@ -253,47 +281,60 @@ function updateSim(){
 
   // (1) update times
 
-    time +=dt; // dt depends on timewarp slider (fps=const)
-    itime++;
-    isSmartphone=mqSmartphone();
+  time +=dt; // dt depends on timewarp slider (fps=const)
+  itime++;
+  isSmartphone=mqSmartphone();
 
+  // test code at point (5)
 
+  
   // (2) transfer effects from slider interaction and mandatory regions
   // to the vehicles and models
+  // longModelCar etc defined in control_gui.js
 
+  
 
-    mainroad.updateTruckFrac(fracTruck, fracTruckToleratedMismatch);
-    mainroad.updateModelsOfAllVehicles(longModelCar,longModelTruck,
+  mainroad.updateTruckFrac(fracTruck, fracTruckToleratedMismatch);
+  mainroad.updateModelsOfAllVehicles(longModelCar,longModelTruck,
 				       LCModelCar,LCModelTruck,
 				       LCModelMandatory);
-    mainroad.updateDensity(density);
+  mainroad.updateDensity(density);
 
+  
   // (2a) update moveable speed limits
 
   mainroad.updateSpeedlimits(trafficObjs); 
 
 
-    // do central simulation update of vehicles
+    // (2b) do central simulation update of vehicles
 
-    mainroad.updateLastLCtimes(dt);
-    mainroad.calcAccelerations();  
-    mainroad.changeLanes();      //!!! ideally do MOBIL with determ accel    
-    mainroad.updateSpeedPositions();
+  mainroad.updateLastLCtimes(dt);
+  mainroad.calcAccelerations();  
+  mainroad.changeLanes();      //!!! ideally do MOBIL with determ accel    
+  mainroad.updateSpeedPositions();
 
     //if(itime<2){mainroad.writeVehicleLongModels();}
     //if(itime<2){mainroad.writeVehicleLCModels();}
 
-    for(var iDet=0; iDet<detectors.length; iDet++){
+  for(var iDet=0; iDet<detectors.length; iDet++){
 	detectors[iDet].update(time,dt);
-    }
-
+  }
   
   if(userCanDropObjects&&(!isSmartphone)&&(!trafficObjPicked)){
     trafficObjs.zoomBack();
   }
 
 
-  // (6) debug output
+  //##############################################################
+  // (5) debug output
+  //##############################################################
+
+  if(false){
+    debugVeh(211,network);
+    debugVeh(212,network);
+  }
+  
+  if(debug){crashinfo.checkForCrashes(network);} //!! deact for production
   
   if(false){
     mainroad.writeTrucksLC();
@@ -301,7 +342,44 @@ function updateSim(){
 
   }
 
-}  // updateSim
+  // 
+
+  if(false){//!!
+
+    //!! in different road operations (setSpeedlimit) order of
+    // trafficObjs.trafficObj array changed in increasing u
+    // can only select unique trafficObj at initialization or, as here,
+    // when filtering for attributes
+
+    var TL;
+    for(var iobj=0; iobj<trafficObjs.trafficObj.length; iobj++){
+      if(trafficObjs.trafficObj[iobj].id==100){// first TL
+	TL=trafficObjs.trafficObj[iobj];
+      }
+    }
+    //var TL=trafficObjs.trafficObj.slice(0,2);  // last index not included
+
+    // drop red traffic light (dropObject includes activate)
+
+    if(itime==1){
+      var udrop=0.25*network[0].roadLen;
+      trafficObjs.setTrafficLight(TL,"red");
+      trafficObjs.dropObject(TL,network,
+			     network[0].traj[0](udrop),
+			     network[0].traj[1](udrop),
+			     20,);
+    }
+
+    // switch TL to greem
+
+    if(itime==100){
+      console.log("set first TL to green");
+      trafficObjs.setTrafficLight(TL,"green");
+    }
+  }
+
+
+}// updateSim
 
 
 
@@ -363,7 +441,7 @@ function drawSim() {
   ctx.setTransform(1,0,0,1,0,0);
   if(drawBackground){
     if(hasChanged||(itime<=10) || (itime%50==0) || userCanvasManip
-      || (!drawRoad)){
+      || (!drawRoad)||drawVehIDs){
       ctx.drawImage(background,0,0,canvas.width,canvas.height);
     }
   }
@@ -371,16 +449,17 @@ function drawSim() {
   // (3) draw road and possibly traffic lights afterwards (before vehs)
  
   var changedGeometry=userCanvasManip || hasChanged||(itime<=1);
-  mainroad.draw(roadImg1,roadImg2,scale,changedGeometry);
-
+  mainroad.draw(roadImg1,roadImg2,changedGeometry);
+  if(drawRoadIDs){mainroad.drawRoadID();}
+  
     // (4) draw vehicles
 
-  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
   // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box
@@ -396,9 +475,13 @@ function drawSim() {
 	detectors[iDet].display(textsize);
   }
 
+  // (6a) show scale info
+  // get from onramp.js if needed
+  
 
 
-  // (7) draw the speed colormap (text size propto widthPix
+  // (6b) draw the speed colormap
+  //!! Now always false; drawn statically by html file!
 
   if(drawColormap){
     displayColormap(scale*(center_xPhys-0.03*roadRadius),
@@ -407,6 +490,13 @@ function drawSim() {
 		    vmin_col,vmax_col,0,100/3.6);
   }
 
+  // drawSim (7): show logical coordinates if activated
+
+  if(showCoords&&mouseInside){
+    showLogicalCoords(xPixUser,yPixUser);
+  }
+
+  
   // (8) xxxNew draw TL editor panel
 
   if(trafficLightControl.isActive){

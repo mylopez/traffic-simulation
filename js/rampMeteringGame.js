@@ -175,14 +175,8 @@ var critAspectRatio=1.7; // from css file width/height of #contents
 var refSizePix=Math.min(canvas.height,canvas.width/critAspectRatio);
 var scale=refSizePix/refSizePhys;
 
-//xxxnew [position]
 var hasChanged=true; // window or physical dimensions have changed
-var hasChangedPhys=true; // physical road dimensions have changed 
-                          // in last updateDimensions
-                          // (only true when switching from/to mobile version)
 
-
-//xxxnew
 //<NETWORK>
 //##################################################################
 // init Specification of physical road network geometry
@@ -227,34 +221,10 @@ function updateDimensions(){ // if viewport or sizePhys changed
   center_xPhys=center_xRel*refSizePhys; //[m]
   center_yPhys=center_yRel*refSizePhys;
 
-  //xxxnew
-  // redefine basis of traj*_x, traj*_y or traj_x[], traj_y[]
-  // if hasChangedPhys=true
-
-  if(hasChangedPhys){
-    arcRadius=arcRadiusRel*refSizePhys;
-    arcLen=arcRadius*Math.PI;
-    straightLen=refSizePhys*critAspectRatio-center_xPhys;
-    mainroadLen=mainroad.roadLen=arcLen+2*straightLen; //xxxnew
-    rampLen=ramp.roadLen=rampLenRel*refSizePhys; //!!! two '=' here
-    mergeLen=1.5*arcRadius; // !! also make consistent with init def
-    mainRampOffset=mainroadLen-0.7*straightLen+mergeLen-rampLen;
-    taperLen=0.3*arcRadius; // !! also make consistent with init def
-    rampRadius=5*arcRadius; // !! also make consistent with init def
-
-  
-    // update positions of fixed obstacles to new road lengths/geometry
-    // (e.g. onramp: ramp via the ref virtualStandingVeh)
-    // see "Specification of logical road network" below
-
-    virtualStandingVeh.u=ramp.roadLen-0.9*taperLen; //xxxnew
-
-  }
-  
+ 
   if(true){
     console.log("updateDimensions: mainroadLen=",mainroadLen,
-		" isSmartphone=",isSmartphone, 
-		" hasChangedPhys=",hasChangedPhys);
+		" isSmartphone=",isSmartphone);
   }
 }
 
@@ -402,9 +372,9 @@ var isRing=false;  // 0: false; 1: true
 var roadIDmain=1;
 var roadIDramp=2;
 
-var fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
+fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
 
-var speedInit=20; // IC for speed
+speedInit=20; // IC for speed
 
 var mainroad=new road(roadIDmain,mainroadLen,laneWidth,nLanes_main,
 		      [traj_x,traj_y],
@@ -581,10 +551,9 @@ function updateSim(){
 
     if(isSmartphone!=mqSmartphone()){
       isSmartphone=mqSmartphone();
-      hasChangedPhys=true;
     }
 
-    updateDimensions(); // updates refsizePhys, -Pix, scale, geometry
+    updateDimensions(); // updates refsizePhys, -Pix,  geometry
     trafficObjs.xRelDepot=(canvas.width/canvas.height<critAspectRatio)
       ? 0.35 : 0.35*canvas.height/canvas.width*1.7;
     trafficObjs.calcDepotPositions(canvas);
@@ -761,13 +730,13 @@ function drawSim() {
   
   var changedGeometry=userCanvasManip || hasChanged||(itime<=1)||true; 
 
-  ramp.draw(rampImg,rampImg,scale,changedGeometry,
+  ramp.draw(rampImg,rampImg,changedGeometry,
 	    0,ramp.roadLen,
 	    movingObserver,0,
 	    center_xPhys-mainroad.traj[0](uObs)+ramp.traj[0](0),
 	    center_yPhys-mainroad.traj[1](uObs)+ramp.traj[1](0)); 
 
-  mainroad.draw(roadImg1,roadImg2,scale,changedGeometry,
+  mainroad.draw(roadImg1,roadImg2,changedGeometry,
 		0,mainroad.roadLen,
 		movingObserver,uObs,center_xPhys,center_yPhys);
 
@@ -784,7 +753,7 @@ function drawSim() {
   //!! all args at and after umin,umax=0,ramp.roadLen are optional
   // here only example for complete args (only in coffeemeterGame relevant
 
-  ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+  ramp.drawVehicles(carImg,truckImg,obstacleImgs,
 		    vmin_col,vmax_col,
 		    0,ramp.roadLen,
 		    movingObserver,0,
@@ -792,7 +761,7 @@ function drawSim() {
 		    center_yPhys-mainroad.traj[1](uObs)+ramp.traj[1](0));
 
 
-  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,
 			vmin_col,vmax_col,
 			0,mainroad.roadLen,
 			movingObserver,uObs,center_xPhys,center_yPhys);
@@ -800,7 +769,7 @@ function drawSim() {
   // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box
@@ -822,7 +791,7 @@ function drawSim() {
     ctx.setTransform(1,0,0,1,0,0); 
     var textsize=0.02*Math.min(canvas.width,canvas.height); // 2vw;
     ctx.font=textsize+'px Arial';
-    var scaleStr=" scale="+Math.round(10*scale)/10;
+    var scaleStr=" scale="+Math.round(10*)/10;
     var scaleStr_xlb=9*textsize;
     var scaleStr_ylb=timeStr_ylb;
     var scaleStr_width=5*textsize;
@@ -849,7 +818,6 @@ function drawSim() {
   // (updateDimensions) or if old sign should be wiped away 
 
   hasChanged=false;
-  hasChangedPhys=false; //xxxnew
 
   // revert to neutral transformation at the end!
 

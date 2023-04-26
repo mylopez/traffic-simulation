@@ -1,5 +1,21 @@
 
+//#############################################################
+// general ui settings
+//#############################################################
+
 const userCanDropObjects=true;
+var showCoords=true;  // show logical coords of nearest road to mouse pointer
+                      // definition => showLogicalCoords(.) in canvas_gui.js
+
+//#############################################################
+// general debug settings (set=false for public deployment)
+//#############################################################
+
+drawVehIDs=false; // override control_gui.js
+drawRoadIDs=false; // override control_gui.js
+var debug=false;
+var crashinfo=new CrashInfo();
+
 
 //#############################################################
 // adapt standard param settings from control_gui.js
@@ -332,9 +348,9 @@ function trajRamp_y(u){ // physical coordinates
 //##################################################################
 
 
-var speedInit=20; // m/s
+speedInit=20; // m/s
 var density=0.001;
-var fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
+fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
 
 var isRing=false; 
 
@@ -347,15 +363,27 @@ var ramp=new road(2,lDev,laneWidthRamp,nLanes_rmp,
 
 network[0]=mainroad;
 network[1]=ramp;
+for(var ir=0; ir<network.length; ir++){
+  network[ir].drawVehIDs=drawVehIDs;
+}
 
 // offramp specification; controlled by mainroad
 
+
 var duTactical=300; // anticipation distance for applying mandatory LC rules
-var offrampIDs=[2];
-var offrampLastExits=[umainDiverge+lrampDev];
-var offrampToRight=[true];
-mainroad.setOfframpInfo(offrampIDs,offrampLastExits,offrampToRight);
 mainroad.duTactical=duTactical;
+
+var targets=[ramp];  // array with one element 2
+var isMerge=[false];
+var mergeDivergeLen=[lrampDev];
+var uLast=[umainDiverge+lrampDev];
+var offrampToRight=[true];
+
+mainroad.initMergeDiverge(targets,isMerge,
+			  mergeDivergeLen,uLast,offrampToRight);
+
+
+
 
 
 //############################################
@@ -691,32 +719,33 @@ function drawSim() {
 
 
  
-    // (3) draw mainroad and ramps (deviation "bridge" => draw last)
-    // and vehicles (directly after frawing resp road or separately, depends)
-    // (always drawn; changedGeometry only triggers building a new lookup table)
-    //!!! sometimes road elements are moved as though they were vehicles
-    // check/debug with omitting drawing of the road (changedGeometry=false)!
+  // drawSim (3)(4)
+  // draw mainroad and ramps (deviation "bridge" => draw last)
+  // and vehicles (directly after frawing resp road or separately, depends)
+  // (always drawn; changedGeometry only triggers building a new lookup table)
     
     var changedGeometry=userCanvasManip || hasChanged||(itime<=1); 
     //var changedGeometry=false; 
 
-    ramp.draw(rampImg,rampImg,scale,changedGeometry);
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+  ramp.draw(rampImg,rampImg,changedGeometry);
+  if(drawRoadIDs){ramp.drawRoadID();}
+  ramp.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
-    mainroad.draw(roadImg1,roadImg2,scale,changedGeometry);
-    mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,vmin_col,vmax_col);
+  mainroad.draw(roadImg1,roadImg2,changedGeometry);
+  if(drawRoadIDs){mainroad.drawRoadID();}
+  mainroad.drawVehicles(carImg,truckImg,obstacleImgs,vmin_col,vmax_col);
 
     // redraw first/last deviation vehicles obscured by mainroad drawing
  
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    ramp.drawVehicles(carImg,truckImg,obstacleImgs,
 			  vmin_col,vmax_col,0,lrampDev);
-    ramp.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    ramp.drawVehicles(carImg,truckImg,obstacleImgs,
 			   vmin_col,vmax_col,lDev-lrampDev, lDev);
 
    // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box

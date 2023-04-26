@@ -5,6 +5,15 @@ nLanesMin=2;
 nLanesMax=4; 
 
 //#############################################################
+// stochasticity settings (acceleration noise spec at top of models.js)
+//#############################################################
+
+var driver_varcoeff=0.01; //!!! v0 and a coeff of variation (of "agility")
+                          // need later call road.setDriverVariation(.); 
+
+factor_v0_truck=1;
+
+//#############################################################
 // adapt standard IDM and MOBIL model parameters from control_gui.js
 // since no sliders for that.
 // Values are distributed in updateModels() => truck model derivatives
@@ -38,7 +47,7 @@ IDM_v0=140./3.6;
 slider_IDM_v0.value=3.6*IDM_v0;
 slider_IDM_v0Val.innerHTML=3.6*IDM_v0+" km/h";
 
-qIn=1850./3600; // inflow 1550./3600; 
+qIn=1680./3600; // inflow 1550./3600; 
 slider_qIn.value=3600*qIn;
 slider_qInVal.innerHTML=formd0(3600*qIn)+" Fz/h";
 
@@ -185,8 +194,8 @@ function traj_y(u){ // physical coordinates
 
 var isRing=false;  // 0: false; 1: true
 var roadID=1;
-var speedInit=20; // IC for speed
-var fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
+speedInit=20; // IC for speed
+fracTruckToleratedMismatch=1.0; // 100% allowed=>changes only by sources
 
 var mainroad=new road(roadID,mainroadLen,laneWidth,nLanes_main,
 		      [traj_x,traj_y],
@@ -498,19 +507,19 @@ function drawSim() {
 
     
     var changedGeometry=userCanvasManip || hasChanged||(itime<=1); 
-    mainroad.draw(roadImg1,roadImg2,scale,changedGeometry);
+    mainroad.draw(roadImg1,roadImg2,changedGeometry);
 
 
  
     // (4) draw vehicles
 
-    mainroad.drawVehicles(carImg,truckImg,obstacleImgs,scale,
+    mainroad.drawVehicles(carImg,truckImg,obstacleImgs,
 			  vmin_col, vmax_col);
     
   // (5a) draw traffic objects 
 
   if(userCanDropObjects&&(!isSmartphone)){
-    trafficObjs.draw(scale);
+    trafficObjs.draw();
   }
 
   // (5b) draw speedlimit-change select box

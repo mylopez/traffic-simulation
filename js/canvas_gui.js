@@ -245,7 +245,7 @@ function showLogicalCoords(xPixUser,yPixUser){
   var coordsStr_width=12*textsize;
   var coordsStr_height=1.2*textsize;
   var coordsStr_xlb=0.88*canvas.width-0.5*coordsStr_width;
-  var coordsStr_ylb=0.88*canvas.height;
+  var coordsStr_ylb=0.90*canvas.height;
 
   ctx.setTransform(1,0,0,1,0,0);
   ctx.font=textsize+'px Arial';
@@ -461,7 +461,7 @@ function finishDistortOrDropObject(xUser, yUser){
     var distCrit_m=20;  // optimize!!
     var distCritPix=distCrit_m*scale;
     trafficObjs.dropObject(trafficObject, network, 
-			   xUser, yUser, distCritPix, scale);
+			   xUser, yUser, distCritPix, );
     trafficObjPicked=false;
     console.log("  end finishDistortOrDropObject: dropped object!");
   }
@@ -500,12 +500,14 @@ function handleClick(event){
   // overrides all other click actions
   //################################################
 
-  if((trafficLightControl.isActive)
-     && trafficLightControl.mouseIsInside(xPixUser, yPixUser)){
-    console.log("handleClick: in trafficLightControl part");
-    trafficLightControl.selectCycleTime([xPixUser, yPixUser]);
+  if(!(typeof trafficLightControl === 'undefined')){
+    if((trafficLightControl.isActive)
+       && trafficLightControl.mouseIsInside(xPixUser, yPixUser)){
+      console.log("handleClick: in trafficLightControl part");
+      trafficLightControl.selectCycleTime([xPixUser, yPixUser]);
 
-    return; 
+      return;
+    }
   }
 
 
@@ -703,6 +705,8 @@ function activateSpeedlBox(xPixUser,yPixUser){
 
 function changeSpeedl(xPixUser,yPixUser){
 
+  // free: >=130, image filename figs/speedLimit_00.svg
+
   console.log("\n\nitime=",itime," in changeSpeedl (canvas_gui):",
 	      " speedlBoxActive=",speedlBoxActive);
   if(speedlBoxActive){
@@ -723,8 +727,8 @@ function changeSpeedl(xPixUser,yPixUser){
       var fileIndex=(0.1*obj.value<13)
 	? Math.round(0.1*obj.value) : 0;
       obj.image.src = "figs/speedLimit_"+(fileIndex)+"0.svg";
-      //console.log("  traffic object of id=",obj.id,
-//		  " has new speed limit ",obj.value);
+      console.log("  traffic object of id=",obj.id,
+		  " has new speed limit ",obj.value);
     }
   }
   speedlBoxActive=false; // apply only once
